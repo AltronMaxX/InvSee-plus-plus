@@ -34,7 +34,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 	final DifferenceTracker tracker;
 	
 	private static MenuType<?> determineMenuType(EnderNmsInventory inv) {
-		return switch(inv.getContainerSize()) {
+		return switch (inv.getContainerSize()) {
 			case 9 -> MenuType.GENERIC_9x1;
 			case 18 -> MenuType.GENERIC_9x2;
 			case 27 -> MenuType.GENERIC_9x3;
@@ -45,11 +45,11 @@ class EnderNmsContainer extends AbstractContainerMenu {
 		};
 	}
 
-	private static Slot makeSlot(Mirror<EnderChestSlot> mirror, EnderNmsInventory top, int positionIndex, int magicX, int magicY) {
+	private static Slot makeSlot(Mirror<EnderChestSlot> mirror, EnderNmsInventory top, int positionIndex, int magicX, int magicY, ItemStack inaccessiblePlaceholder) {
 		final EnderChestSlot place = mirror.getSlot(positionIndex);
 
 		if (place == null) {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY);
+			return new InaccessibleSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY);
 		} else {
 			final int referringTo = place.ordinal();
 			return new Slot(top, referringTo, magicX, magicY);
@@ -117,7 +117,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 				int magicX = 8 + xPos * 18;
 				int magicY = 18 + yPos * 18;
 
-				super.addSlot(makeSlot(mirror, top, index, magicX, magicY));	// Mohist compat: call super.addSlot instead of this.addSlot
+				addSlot(makeSlot(mirror, top, index, magicX, magicY, CraftItemStack.asNMSCopy(creationOptions.getPlaceholderPalette().inaccessible())));
 			}
 		}
 		
@@ -130,7 +130,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 				int index = xPos + yPos * 9;
 				int magicX = 8 + xPos * 18;
 				int magicY = 103 + yPos * 18 + magicAddY;
-				super.addSlot(new Slot(bottom, index, magicX, magicY));			// Mohist compat: call super.addSlot instead of this.addSlot
+				addSlot(new Slot(bottom, index, magicX, magicY));
 			}
 		}
 		
@@ -139,7 +139,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 			int index = xPos;
 			int magicX = 8 + xPos * 18;
 			int magicY = 161 + magicAddY;
-			super.addSlot(new Slot(bottom, index, magicX, magicY));				// Mohist compat: call super.addSlot instead of this.addSlot
+			addSlot(new Slot(bottom, index, magicX, magicY));
 		}
 	}
 
@@ -162,7 +162,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
         //remember that we are called from inside the body of a loop!
 
 		ItemStack itemStack = ItemStack.EMPTY;
-		Slot slot = this.getSlot(rawIndex);
+		Slot slot = getSlot(rawIndex);
 		
 		if (slot != null && slot.hasItem()) {
 			ItemStack clickedSlotItem = slot.getItem();
@@ -170,7 +170,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 			itemStack = clickedSlotItem.copy();
 			if (rawIndex < topRows * 9) {
 				//clicked in the top inventory
-				if (!moveItemStackTo(clickedSlotItem, topRows * 9, this.slots.size(), true)) {
+				if (!moveItemStackTo(clickedSlotItem, topRows * 9, slots.size(), true)) {
 					return ItemStack.EMPTY;
 				}
 			} else {
@@ -193,30 +193,5 @@ class EnderNmsContainer extends AbstractContainerMenu {
 	public String title() {
 		return title != null ? title : originalTitle;
 	}
-
-
-	// === workarounds for Mohist ===
-	//TODO are SRG names stable?
-
-//	@Override
-//	public MenuType<?> getType() {
-//		return super.getType();
-//	}
-//
-//	public void m_150399_(int i, int j, ClickType clicktype, Player entityHuman) {
-//		clicked(i, j, clicktype, entityHuman);
-//	}
-//
-//	public void m_6877_(Player entityHuman) {
-//		removed(entityHuman);
-//	}
-//
-//	public boolean m_6875_(Player entityHuman) {
-//		return stillValid(entityHuman);
-//	}
-//
-//	public ItemStack m_7648_(Player entityHuman, int rawIndex) {
-//		return quickMoveStack(entityHuman, rawIndex);
-//	}
 
 }

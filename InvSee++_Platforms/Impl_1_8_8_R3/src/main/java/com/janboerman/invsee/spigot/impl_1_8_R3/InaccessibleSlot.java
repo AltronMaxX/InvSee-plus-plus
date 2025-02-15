@@ -5,9 +5,9 @@ import net.minecraft.server.v1_8_R3.IInventory;
 import net.minecraft.server.v1_8_R3.ItemStack;
 import net.minecraft.server.v1_8_R3.Slot;
 
-public class InaccessibleSlot extends Slot {
+class InaccessibleSlot extends Slot {
 
-    public InaccessibleSlot(IInventory inventory, int index, int xPos, int yPos) {
+    InaccessibleSlot(IInventory inventory, int index, int xPos, int yPos) {
         super(inventory, index, xPos, yPos);
     }
 
@@ -47,4 +47,21 @@ public class InaccessibleSlot extends Slot {
     public boolean isAllowed(EntityHuman player) {
         return false;
     }
+}
+
+class InaccessiblePlaceholderSlot extends InaccessibleSlot {
+
+    private final ItemStack placeholder;
+
+    InaccessiblePlaceholderSlot(ItemStack placeholder, IInventory inventory, int index, int xPos, int yPos) {
+        super(inventory, index, xPos, yPos);
+
+        this.placeholder = placeholder;
+    }
+
+    @Override
+    public ItemStack getItem() {
+        return placeholder;
+    }
+
 }

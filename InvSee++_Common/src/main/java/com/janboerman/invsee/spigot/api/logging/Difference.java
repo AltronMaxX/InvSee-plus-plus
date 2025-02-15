@@ -9,8 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.janboerman.invsee.spigot.api.SpectatorInventoryView;
+
 /**
- * The Difference of a {@link com.janboerman.invsee.spigot.api.SpectatorInventoryView} is the set of items that were added and removed the {@link com.janboerman.invsee.spigot.api.SpectatorInventory}.
+ * The Difference of a {@link SpectatorInventoryView} is the set of items that were added and removed the {@link com.janboerman.invsee.spigot.api.SpectatorInventory}.
  */
 public class Difference {
 
@@ -43,7 +45,7 @@ public class Difference {
      * @param other the other difference
      */
     public void merge(Difference other) {
-        for (var entry : other.diffs.entrySet()) {
+        for (Map.Entry<ItemType, Integer> entry : other.diffs.entrySet()) {
             accumulate(entry.getKey(), entry.getValue());
         }
     }

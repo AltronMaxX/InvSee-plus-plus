@@ -2,19 +2,21 @@ package com.janboerman.invsee.spigot.impl_1_20_1_R1;
 
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventory;
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventoryView;
+import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
 import com.janboerman.invsee.spigot.api.logging.Difference;
 import com.janboerman.invsee.spigot.api.logging.DifferenceTracker;
 import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftInventoryView;
 import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack;
 import org.bukkit.entity.HumanEntity;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import javax.annotation.Nullable;
 
-class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
+class EnderBukkitInventoryView extends BukkitInventoryView<EnderChestSlot> implements EnderSpectatorInventoryView {
 
-    private final EnderNmsContainer nms;
+    final EnderNmsContainer nms;
 
     EnderBukkitInventoryView(EnderNmsContainer nms) {
         super(nms.creationOptions);
@@ -34,6 +36,11 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
     @Override
     public HumanEntity getPlayer() {
         return nms.player.getBukkitEntity();
+    }
+
+    @Override
+    public InventoryType getType() {
+        return InventoryType.CHEST;
     }
 
     @Override
@@ -64,7 +71,17 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
 
     @Override
     public ItemStack getItem(int slot) {
-        return slot < 0 ? null : CraftItemStack.asCraftMirror(nms.getSlot(slot).getItem());
+        if (slot < 0) {
+            return null;
+        } else {
+            net.minecraft.world.item.ItemStack nmsStack;
+            if (slot < nms.top.getContainerSize()) {
+                nmsStack = nms.top.getContents().get(slot);
+            } else {
+                nmsStack = nms.getSlot(slot).getItem();
+            }
+            return CraftItemStack.asCraftMirror(nmsStack);
+        }
     }
 
     @Override

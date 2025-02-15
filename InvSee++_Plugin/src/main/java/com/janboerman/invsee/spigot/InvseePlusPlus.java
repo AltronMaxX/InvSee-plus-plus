@@ -10,6 +10,7 @@ import com.janboerman.invsee.spigot.api.Title;
 import com.janboerman.invsee.spigot.api.logging.LogGranularity;
 import com.janboerman.invsee.spigot.api.logging.LogOptions;
 import com.janboerman.invsee.spigot.api.logging.LogTarget;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette;
 import com.janboerman.invsee.spigot.api.target.Target;
 /*
 import com.janboerman.invsee.spigot.multiverseinventories.MultiverseInventoriesHook;
@@ -27,6 +28,10 @@ import com.janboerman.invsee.spigot.perworldinventory.PerWorldInventoryHook;
 import com.janboerman.invsee.spigot.perworldinventory.PerWorldInventorySeeApi;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
+import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -41,13 +46,15 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class InvseePlusPlus extends JavaPlugin {
+public class InvseePlusPlus extends JavaPlugin implements com.janboerman.invsee.spigot.api.InvseePlusPlus {
 
     private final boolean asyncTabcompleteEvent;
 
     private InvseeAPI api;
-    @Deprecated(forRemoval = true) private OfflinePlayerProvider offlinePlayerProvider;
+    private InvseePlatform platform;
+    @Deprecated/*(forRemoval = true)*/ private OfflinePlayerProvider offlinePlayerProvider; //TODO remove in 1.0.0
 
     private CreationOptions<PlayerInventorySlot> platformCreationOptionsMainInventory;
     private CreationOptions<EnderChestSlot> platformCreationOptionsEnderInventory;
@@ -76,7 +83,7 @@ public class InvseePlusPlus extends JavaPlugin {
         final NamesAndUUIDs lookup = new NamesAndUUIDs(this, scheduler);
         final OpenSpectatorsCache cache = new OpenSpectatorsCache();
         Setup setup = Setup.setup(this, scheduler, lookup, cache);
-        final InvseePlatform platform = setup.platform();
+        platform = setup.platform();
         final OfflinePlayerProvider playerDatabase = setup.offlinePlayerProvider();
 
         //set up default creation options
@@ -118,6 +125,7 @@ public class InvseePlusPlus extends JavaPlugin {
         api.setMainInventoryMirror(getInventoryMirror(config));
         api.setEnderInventoryMirror(getEnderChestMirror(config));
         api.setLogOptions(getLogOptions(config));
+        api.setPlaceholderPalette(getPlaceholderPalette(platform, config));
 
         //commands
         setupCommands();
@@ -202,6 +210,16 @@ public class InvseePlusPlus extends JavaPlugin {
      */
     public InvseeAPI getApi() {
         return api;
+    }
+
+    /**
+     * Internal api.
+     * @return a stream containing all materials the server knows about
+     */
+    //Should probably move this method somewhere else.
+    //I do like this location though because it's accessible for built-in addons, but not public api.
+    public Stream<Material> itemMaterials() {
+        return platform.materials();
     }
 
     /**
@@ -391,6 +409,23 @@ public class InvseePlusPlus extends JavaPlugin {
         }
     }
 
+    public PlaceholderPalette getPlaceholderPalette() {
+        return getPlaceholderPalette(platform, getConfig());
+    }
+
+    public PlaceholderPalette getPlaceholderPalette(InvseePlatform platform, FileConfiguration config) {
+        String paletteName = config.getString("placeholder-palette");
+        PlaceholderPalette palette;
+        if (paletteName == null) {
+            dirtyConfig = true;
+            palette = platformCreationOptionsMainInventory.getPlaceholderPalette();
+            config.set("placeholder-palette", palette.toString());
+        } else {
+            palette = platform.getPlaceholderPalette(paletteName);
+        }
+        return palette;
+    }
+
     private File getConfigFile() {
         return new File(getDataFolder(), "config.yml");
     }
@@ -408,21 +443,21 @@ public class InvseePlusPlus extends JavaPlugin {
     }
 
     /** @deprecated use {@link #getTitleForInventory()} instead. */
-    @Deprecated(forRemoval = true, since = "0.21.0")
+    @Deprecated//(forRemoval = true, since = "0.21.0") //TODO remove in 1.0
     public String getTitleForInventory(Target target) {
         return getConfig().getString("titles.inventory", "<player>'s inventory")
                 .replace("<player>", target.toString());
     }
 
     /** @deprecated use {@link #getTitleForEnderChest()} instead.*/
-    @Deprecated(forRemoval = true, since = "0.21.0")
+    @Deprecated//(forRemoval = true, since = "0.21.0") //TODO remove in 1.0
     public String getTitleForEnderChest(Target target) {
         return getConfig().getString("titles.enderchest", "<player>'s enderchest")
                 .replace("<player>", target.toString());
     }
 
     /** @deprecated use {@link #getInventoryMirror()} instead. */
-    @Deprecated(forRemoval = true, since = "0.21.0")
+    @Deprecated//(forRemoval = true, since = "0.21.0") //TODO remove in 1.0
     public String getInventoryTemplate() {
         return getConfig().getString("templates.inventory",
                 "i_00 i_01 i_02 i_03 i_04 i_05 i_06 i_07 i_08\n" +
@@ -434,7 +469,7 @@ public class InvseePlusPlus extends JavaPlugin {
     }
 
     /** @deprecated use {@link #getEnderChestMirror()} instead. */
-    @Deprecated(forRemoval = true, since = "0.21.0")
+    @Deprecated//(forRemoval = true, since = "0.21.0") //TODO remove in 1.0
     public String getEnderChestTemplate() {
         return getConfig().getString("templates.enderchest",
                 "e_00 e_01 e_02 e_03 e_04 e_05 e_06 e_07 e_08\n" +
@@ -446,9 +481,16 @@ public class InvseePlusPlus extends JavaPlugin {
     }
 
     /** @deprecated use your own player database instead. */
-    @Deprecated(forRemoval = true, since = "0.22.0")
+    @Deprecated//(forRemoval = true, since = "0.22.0") //TODO remove in 1.0
     public OfflinePlayerProvider getOfflinePlayerProvider() {
         return offlinePlayerProvider;
     }
 
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String alias, String[] args) {
+        sender.sendMessage(ChatColor.YELLOW + "Oh no! It looks like InvSee++ didn't start correctly!");
+        sender.sendMessage(ChatColor.YELLOW + "Most likely this is a Minecraft/InvSee++ version mismatch.");
+        sender.sendMessage(ChatColor.YELLOW + "Check your logs for more information.");
+        return true;
+    }
 }

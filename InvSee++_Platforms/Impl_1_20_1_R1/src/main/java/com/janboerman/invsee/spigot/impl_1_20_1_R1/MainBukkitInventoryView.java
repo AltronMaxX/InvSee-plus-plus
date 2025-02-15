@@ -4,17 +4,20 @@ import com.janboerman.invsee.spigot.api.MainSpectatorInventory;
 import com.janboerman.invsee.spigot.api.MainSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.logging.Difference;
 import com.janboerman.invsee.spigot.api.logging.DifferenceTracker;
+import com.janboerman.invsee.spigot.api.template.PlayerInventorySlot;
+
 import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftInventoryView;
 import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack;
 import org.bukkit.entity.HumanEntity;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import javax.annotation.Nullable;
 
-class MainBukkitInventoryView extends MainSpectatorInventoryView {
+class MainBukkitInventoryView extends BukkitInventoryView<PlayerInventorySlot> implements MainSpectatorInventoryView {
 
-    private final MainNmsContainer nms;
+    final MainNmsContainer nms;
 
     MainBukkitInventoryView(MainNmsContainer nms) {
         super(nms.creationOptions);
@@ -34,6 +37,11 @@ class MainBukkitInventoryView extends MainSpectatorInventoryView {
     @Override
     public HumanEntity getPlayer() {
         return nms.player.getBukkitEntity();
+    }
+
+    @Override
+    public InventoryType getType() {
+        return InventoryType.CHEST;
     }
 
     @Override
@@ -64,7 +72,17 @@ class MainBukkitInventoryView extends MainSpectatorInventoryView {
 
     @Override
     public ItemStack getItem(int slot) {
-        return slot < 0 ? null : CraftItemStack.asCraftMirror(nms.getSlot(slot).getItem());
+        if (slot < 0) {
+            return null;
+        } else {
+            net.minecraft.world.item.ItemStack nmsStack;
+            if (slot < nms.top.getContainerSize()) {
+                nmsStack = nms.top.getContents().get(slot);
+            } else {
+                nmsStack = nms.getSlot(slot).getItem();
+            }
+            return CraftItemStack.asCraftMirror(nmsStack);
+        }
     }
 
     @Override

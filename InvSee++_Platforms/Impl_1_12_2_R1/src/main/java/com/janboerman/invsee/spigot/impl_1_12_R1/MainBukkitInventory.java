@@ -1,5 +1,9 @@
 package com.janboerman.invsee.spigot.impl_1_12_R1;
 
+import com.janboerman.invsee.utils.Ref;
+import com.janboerman.invsee.spigot.api.CreationOptions;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderGroup;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette;
 import com.janboerman.invsee.spigot.api.template.Mirror;
 import com.janboerman.invsee.spigot.api.template.PlayerInventorySlot;
 import com.janboerman.invsee.spigot.internal.inventory.MainInventory;
@@ -7,6 +11,7 @@ import net.minecraft.server.v1_12_R1.IInventory;
 import net.minecraft.server.v1_12_R1.InventoryCrafting;
 import net.minecraft.server.v1_12_R1.InventoryMerchant;
 import org.bukkit.Material;
+import org.bukkit.craftbukkit.v1_12_R1.entity.CraftPlayer;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftInventory;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftInventoryAnvil;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftInventoryCrafting;
@@ -14,12 +19,12 @@ import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftInventoryEnchanting;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftInventoryMerchant;
 import org.bukkit.craftbukkit.v1_12_R1.inventory.CraftItemStack;
 import org.bukkit.entity.HumanEntity;
-import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 
 public class MainBukkitInventory extends CraftInventory implements MainInventory<MainNmsInventory, MainBukkitInventory> {
@@ -37,27 +42,48 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
     public void watch(InventoryView targetPlayerView) {
         Objects.requireNonNull(targetPlayerView, "targetPlayerView cannot be null");
 
+        PlaceholderGroup placeholderGroup = null;
+
         MainNmsInventory nms = getInventory();
         Inventory top = targetPlayerView.getTopInventory();
         if (top instanceof CraftInventoryCrafting) {
             //includes a player's own crafting slots
             InventoryCrafting targetCrafting = (InventoryCrafting) ((CraftInventoryCrafting) top).getInventory();
             nms.personalContents = targetCrafting.getContents(); //luckily this getContents() method does not copy.
+            placeholderGroup = PlaceholderGroup.CRAFTING;
         } else if (top instanceof CraftInventoryAnvil) {
             IInventory repairItems = ((CraftInventoryAnvil) top).getInventory();
             nms.personalContents = repairItems.getContents();
+            placeholderGroup = PlaceholderGroup.ANVIL;
         } else if (top instanceof CraftInventoryEnchanting) {
             IInventory enchantItems = ((CraftInventoryEnchanting) top).getInventory();
             nms.personalContents = enchantItems.getContents();
+            placeholderGroup = PlaceholderGroup.ENCHANTING;
         } else if (top instanceof CraftInventoryMerchant) {
             InventoryMerchant merchantItems = ((CraftInventoryMerchant) top).getInventory();
-            nms.personalContents = merchantItems.getContents();
+            nms.personalContents = merchantItems.getContents().subList(0, 2);
+            placeholderGroup = PlaceholderGroup.MERCHANT;
         }
 
-        //do this at the nms level so that I can save on packets? (only need to update the last 9 slots :-))
+        //send personal slots changes
         for (HumanEntity viewer : getViewers()) {
-            if (viewer instanceof Player) {
-                ((Player) viewer).updateInventory();
+            CraftPlayer spectator;
+            MainBukkitInventoryView view;
+            if (viewer instanceof CraftPlayer && (spectator = (CraftPlayer) viewer).getOpenInventory() instanceof MainBukkitInventoryView) {
+                view = (MainBukkitInventoryView) spectator.getOpenInventory();
+                CreationOptions<PlayerInventorySlot> creationOptions = view.nms.creationOptions;
+                Mirror<PlayerInventorySlot> mirror = creationOptions.getMirror();
+                com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette palette = creationOptions.getPlaceholderPalette();
+
+                for (int i = PlayerInventorySlot.PERSONAL_00.defaultIndex(); i <= PlayerInventorySlot.PERSONAL_08.defaultIndex(); i++) {
+                    Integer rawIndex = mirror.getIndex(PlayerInventorySlot.byDefaultIndex(i));
+                    if (rawIndex != null) { // null rawIndex does not happen if the server admin configured the template correctly.
+                        net.minecraft.server.v1_12_R1.ItemStack stack = InvseeImpl.getItemOrPlaceholder(palette, view, rawIndex, placeholderGroup);
+                        InvseeImpl.sendItemChange(spectator.getHandle(), rawIndex, stack);
+                    } else {
+                        InvseeImpl.sendItemChange(spectator.getHandle(), i, CraftItemStack.asNMSCopy(palette.inaccessible()));
+                    }
+                }
             }
         }
     }
@@ -67,10 +93,25 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
         MainNmsInventory nms = getInventory();
         nms.personalContents = nms.playerCraftingContents;
 
-        //do this at the nms level so that I can save on packets? (only need to update the last 9 slots :-))
+        //send personal slots changes
         for (HumanEntity viewer : getViewers()) {
-            if (viewer instanceof Player) {
-                ((Player) viewer).updateInventory();
+            CraftPlayer spectator;
+            MainBukkitInventoryView view;
+            if (viewer instanceof CraftPlayer && (spectator = (CraftPlayer) viewer).getOpenInventory() instanceof MainBukkitInventoryView) {
+                view = (MainBukkitInventoryView) spectator.getOpenInventory();
+                CreationOptions<PlayerInventorySlot> creationOptions = view.nms.creationOptions;
+                Mirror<PlayerInventorySlot> mirror = creationOptions.getMirror();
+                PlaceholderPalette palette = creationOptions.getPlaceholderPalette();
+
+                for (int i = PlayerInventorySlot.PERSONAL_00.defaultIndex(); i <= PlayerInventorySlot.PERSONAL_08.defaultIndex(); i++) {
+                    Integer rawIndex = mirror.getIndex(PlayerInventorySlot.byDefaultIndex(i));
+                    if (rawIndex != null) { // null rawIndex does not happen if the server admin configured the template correctly.
+                        net.minecraft.server.v1_12_R1.ItemStack stack = InvseeImpl.getItemOrPlaceholder(palette, view, rawIndex, PlaceholderGroup.CRAFTING);
+                        InvseeImpl.sendItemChange(spectator.getHandle(), rawIndex, stack);
+                    } else {
+                        InvseeImpl.sendItemChange(spectator.getHandle(), i, CraftItemStack.asNMSCopy(palette.inaccessible()));
+                    }
+                }
             }
         }
     }
@@ -115,7 +156,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
     }
 
     @Override
-    public void setOffHandContents(ItemStack[] offHand){
+    public void setOffHandContents(ItemStack[] offHand) {
         Objects.requireNonNull(offHand, "offHand cannot be null");
         int offHandContentsSize = getInventory().offHand.size();
         if (offHand.length != offHandContentsSize)
@@ -131,7 +172,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
         Objects.requireNonNull(craftingContents, "craftingContents cannot be null");
 
         MainNmsInventory nms = getInventory();
-        var nmsCraftingItems = nms.personalContents;
+        List<net.minecraft.server.v1_12_R1.ItemStack> nmsCraftingItems = nms.personalContents;
         if (nmsCraftingItems != null) {
             int craftingContentsSize = nmsCraftingItems.size();
             if (craftingContents.length != craftingContentsSize)
@@ -145,7 +186,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
 
     @Override
     public ItemStack[] getPersonalContents() {
-        var nmsCraftingItems = getInventory().personalContents;
+        List<net.minecraft.server.v1_12_R1.ItemStack> nmsCraftingItems = getInventory().personalContents;
         if (nmsCraftingItems != null) {
             int craftingContentsSize = nmsCraftingItems.size();
             ItemStack[] result = new ItemStack[craftingContentsSize];
@@ -160,7 +201,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
 
     @Override
     public int getPersonalContentsSize() {
-        var nmsCraftingItems = getInventory().personalContents;
+        List<net.minecraft.server.v1_12_R1.ItemStack> nmsCraftingItems = getInventory().personalContents;
         if (nmsCraftingItems != null) {
             return nmsCraftingItems.size();
         } else {
@@ -170,7 +211,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
 
     @Override
     public void setCursorContents(ItemStack cursor) {
-        var onCursor = getInventory().onCursor;
+        Ref<net.minecraft.server.v1_12_R1.ItemStack> onCursor = getInventory().onCursor;
         if (onCursor != null) {
             onCursor.set(CraftItemStack.asNMSCopy(cursor));
         }
@@ -178,7 +219,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
 
     @Override
     public ItemStack getCursorContents() {
-        var onCursor = getInventory().onCursor;
+        Ref<net.minecraft.server.v1_12_R1.ItemStack> onCursor = getInventory().onCursor;
         if (onCursor != null) {
             return CraftItemStack.asCraftMirror(onCursor.get());
         } else {
@@ -461,15 +502,15 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
         return itemStack; //leftover (couldn't be added)
     }
 
-    private static void addItem(final ItemStack[] contents, final ItemStack add, final int maxStackSize) {
+    private static void addItem(final ItemStack[] contents, final ItemStack add, final int inventoryMaxStackSize) {
         assert contents != null && add != null;
 
         //merge with existing similar item stacks
         for (int i = 0; i < contents.length && add.getAmount() > 0; i++) {
             final ItemStack existingStack = contents[i];
-            if (existingStack != null) {
-                final int maxStackSizeForThisItem = Math.min(maxStackSize, existingStack.getMaxStackSize());
-                if (existingStack.isSimilar(add) && existingStack.getAmount() < maxStackSizeForThisItem) {
+            if (existingStack != null && existingStack.isSimilar(add)) {
+                final int maxStackSizeForThisItem = Math.min(inventoryMaxStackSize, Math.max(existingStack.getMaxStackSize(), add.getAmount()));
+                if (existingStack.getAmount() < maxStackSizeForThisItem) {
                     //how many can we merge (at most)?
                     final int maxMergeAmount = Math.min(maxStackSizeForThisItem - existingStack.getAmount(), add.getAmount());
                     if (maxMergeAmount > 0) {
@@ -478,7 +519,8 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
                             existingStack.setAmount(existingStack.getAmount() + add.getAmount());
                             add.setAmount(0);
                         } else {
-                            //partial merge
+                            //partial merge (item stack to be added couldn't merge completely into the existing stack)
+                            assert maxStackSizeForThisItem == existingStack.getAmount() + maxMergeAmount;
                             existingStack.setAmount(maxStackSizeForThisItem);
                             add.setAmount(add.getAmount() - maxMergeAmount);
                         }
@@ -488,7 +530,7 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
         }
 
         //merge with empty slots
-        final int maxStackSizeForThisItem = Math.min(maxStackSize, add.getMaxStackSize());
+        final int maxStackSizeForThisItem = Math.min(inventoryMaxStackSize, Math.max(add.getMaxStackSize(), add.getAmount()));
         for (int i = 0; i < contents.length && add.getAmount() > 0; i++) {
             if (contents[i] == null || contents[i].getAmount() == 0 || contents[i].getType() == Material.AIR) {
                 if (add.getAmount() <= maxStackSizeForThisItem) {
@@ -496,10 +538,10 @@ public class MainBukkitInventory extends CraftInventory implements MainInventory
                     contents[i] = add.clone();
                     add.setAmount(0);
                 } else {
-                    //partial merge
-                    ItemStack clone = add.clone(); clone.setAmount(maxStackSize);
+                    //partial merge (item stack exceeded max stack size)
+                    ItemStack clone = add.clone(); clone.setAmount(maxStackSizeForThisItem);
                     contents[i] = clone;
-                    add.setAmount(add.getAmount() - maxStackSize);
+                    add.setAmount(add.getAmount() - maxStackSizeForThisItem);
                 }
             }
         }

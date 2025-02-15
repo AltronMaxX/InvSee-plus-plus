@@ -7,13 +7,15 @@ import com.janboerman.invsee.spigot.api.MainSpectatorInventory;
 import com.janboerman.invsee.spigot.api.MainSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.Scheduler;
 import com.janboerman.invsee.spigot.api.SpectatorInventory;
-import com.janboerman.invsee.spigot.api.response.NotCreatedReason;
-import com.janboerman.invsee.spigot.api.response.NotOpenedReason;
-import com.janboerman.invsee.spigot.api.response.OpenResponse;
-import com.janboerman.invsee.spigot.api.response.SpectateResponse;
+import com.janboerman.invsee.spigot.api.event.SpectatorInventorySaveEvent;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderGroup;
+import com.janboerman.invsee.spigot.api.response.*;
 import com.janboerman.invsee.spigot.api.target.Target;
 import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
+import com.janboerman.invsee.spigot.api.template.Mirror;
 import com.janboerman.invsee.spigot.api.template.PlayerInventorySlot;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette;
+import com.janboerman.invsee.spigot.internal.EventHelper;
 import com.janboerman.invsee.spigot.internal.InvseePlatform;
 import com.janboerman.invsee.spigot.internal.NamesAndUUIDs;
 import com.janboerman.invsee.spigot.internal.OpenSpectatorsCache;
@@ -23,11 +25,13 @@ import net.glowstone.GlowServer;
 import net.glowstone.entity.GlowHumanEntity;
 import net.glowstone.entity.GlowPlayer;
 import net.glowstone.entity.meta.profile.GlowPlayerProfile;
+import net.glowstone.inventory.GlowInventorySlot;
 import net.glowstone.io.PlayerDataService.PlayerReader;
 import net.glowstone.io.entity.EntityStore;
 import net.glowstone.io.nbt.NbtPlayerDataService;
 import net.glowstone.net.GameServer;
 import net.glowstone.net.GlowSession;
+import net.glowstone.net.message.play.inv.SetWindowSlotMessage;
 import net.glowstone.util.InventoryUtil;
 import net.glowstone.util.nbt.CompoundTag;
 import org.bukkit.entity.HumanEntity;
@@ -118,7 +122,7 @@ public class InvseeImpl implements InvseePlatform {
     }
 
     @Override
-    public CompletableFuture<Void> saveInventory(MainSpectatorInventory newInventory) {
+    public CompletableFuture<SaveResponse> saveInventory(MainSpectatorInventory newInventory) {
         return save(newInventory, this::spectateInventory, MainSpectatorInventory::setContents);
     }
 
@@ -132,6 +136,34 @@ public class InvseeImpl implements InvseePlatform {
         if (view.openEvent != null && view.openEvent.isCancelled()) {
             return OpenResponse.closed(NotOpenedReason.inventoryOpenEventCancelled(view.openEvent));
         } else {
+            GlowPlayer glowPlayer = (GlowPlayer) spectator;
+
+            //send placeholders
+            Mirror<PlayerInventorySlot> mirror = options.getMirror();
+            PlaceholderPalette palette = options.getPlaceholderPalette();
+            ItemStack inaccessible = palette.inaccessible();
+            for (int inventoryIndex = PlayerInventorySlot.CONTAINER_35.defaultIndex() + 1; inventoryIndex < inv.getSize(); inventoryIndex++) {
+                Integer idx = mirror.getIndex(PlayerInventorySlot.byDefaultIndex(inventoryIndex));
+                if (idx == null) {
+                    sendItemChange(glowPlayer, inventoryIndex, inaccessible);
+                    continue;
+                }
+                int rawIndex = idx.intValue();
+
+                GlowInventorySlot slot = glowInventory.getSlot(inventoryIndex);
+                if (!InventoryUtil.isEmpty(slot.getItem())) continue;
+
+                //slot has no item, send placeholder.
+                if (slot instanceof InaccessibleSlot) sendItemChange(glowPlayer, rawIndex, inaccessible);
+                else if (slot instanceof BootsSlot) sendItemChange(glowPlayer, rawIndex, palette.armourBoots());
+                else if (slot instanceof LeggingsSlot) sendItemChange(glowPlayer, rawIndex, palette.armourLeggings());
+                else if (slot instanceof ChestplateSlot) sendItemChange(glowPlayer, rawIndex, palette.armourChestplate());
+                else if (slot instanceof HelmetSlot) sendItemChange(glowPlayer, rawIndex, palette.armourHelmet());
+                else if (slot instanceof OffhandSlot) sendItemChange(glowPlayer, rawIndex, palette.offHand());
+                else if (slot instanceof CursorSlot) sendItemChange(glowPlayer, rawIndex, palette.cursor());
+                else if (slot instanceof PersonalSlot) sendItemChange(glowPlayer, rawIndex, palette.generic());
+            }
+
             return OpenResponse.open(view);
         }
     }
@@ -149,7 +181,7 @@ public class InvseeImpl implements InvseePlatform {
     }
 
     @Override
-    public CompletableFuture<Void> saveEnderChest(EnderSpectatorInventory newInventory) {
+    public CompletableFuture<SaveResponse> saveEnderChest(EnderSpectatorInventory newInventory) {
         return save(newInventory, this::spectateEnderChest, EnderSpectatorInventory::setContents);
     }
 
@@ -201,7 +233,7 @@ public class InvseeImpl implements InvseePlatform {
                 glowhumanentityStore.load(fakePlayer, tag);
 
                 //return the inventory
-                return SpectateResponse.succeed(invCreator.apply(fakePlayer, options));
+                return SpectateResponse.succeed(EventHelper.callSpectatorInventoryOfflineCreatedEvent(server, invCreator.apply(fakePlayer, options)));
             } catch (IOException e) {
                 return Rethrow.unchecked(e);
             }
@@ -209,8 +241,11 @@ public class InvseeImpl implements InvseePlatform {
         }, runnable -> scheduler.executeSyncPlayer(playerId, runnable, null));
     }
 
-    private <Slot, SI extends SpectatorInventory<Slot>> CompletableFuture<Void> save(SI newInventory, BiFunction<? super HumanEntity, ? super CreationOptions<Slot>, SI> currentInvProvider, BiConsumer<SI, SI> transfer) {
+    private <Slot, SI extends SpectatorInventory<Slot>> CompletableFuture<SaveResponse> save(SI newInventory, BiFunction<? super HumanEntity, ? super CreationOptions<Slot>, SI> currentInvProvider, BiConsumer<SI, SI> transfer) {
         GlowServer server = (GlowServer) plugin.getServer();
+        SpectatorInventorySaveEvent event = EventHelper.callSpectatorInventorySaveEvent(server, newInventory);
+        if (event.isCancelled()) return CompletableFuture.completedFuture(SaveResponse.notSaved(newInventory));
+
         NbtPlayerDataService playerDataService = (NbtPlayerDataService) server.getPlayerDataService();
         UUID playerId = newInventory.getSpectatedPlayerId();
         String playerName = newInventory.getName();
@@ -230,7 +265,7 @@ public class InvseeImpl implements InvseePlatform {
         FakePlayer fakePlayer = new FakePlayer(session, profile, reader);
         GlowstoneHacks.setPlayer(session, fakePlayer);
 
-        return CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             //get player file
             File playerDataFolder = GlowstoneHacks.getPlayerDir(playerDataService);
             File playerFile = new File(playerDataFolder, playerId.toString() + ".dat");
@@ -249,12 +284,59 @@ public class InvseeImpl implements InvseePlatform {
                 glowplayerStore = GlowstoneHacks.findEntityStore(GlowPlayer.class, "save");
                 glowplayerStore.save(fakePlayer, tag);              //save player data to tag.
                 GlowstoneHacks.writeCompressed(playerFile, tag);    //save tag to file.
+
+                //return
+                return SaveResponse.saved(currentInventory);
             } catch (IOException e) {
-                Rethrow.unchecked(e);
+                return Rethrow.unchecked(e);
             }
         }, runnable -> scheduler.executeSyncPlayer(playerId, runnable, null));
     }
 
     //no need to call InventoryOpenEvent manually, GlowPlayer already does this for us! :D
+
+    @Override
+    public PlaceholderPalette getPlaceholderPalette(String name) {
+        switch (name) {
+            case "glass panes": return Placeholders.PALETTE_GLASS;
+            case "icons": return Placeholders.PALETTE_ICONS;
+            default: return PlaceholderPalette.empty();
+        }
+    }
+
+    static void sendItemChange(GlowPlayer player, int rawIndex, ItemStack toSend) {
+        player.getSession().send(new SetWindowSlotMessage(player.getOpenWindowId(), rawIndex, toSend));
+    }
+
+    static ItemStack getItemOrPlaceholder(PlaceholderPalette palette, MainInventoryView view, int rawIndex, PlaceholderGroup group) {
+        MainInventory top = view.getTopInventory();
+
+        GlowInventorySlot slot = top.getSlot(rawIndex);
+        if (!InventoryUtil.isEmpty(slot.getItem())) return slot.getItem();
+
+        if (slot instanceof InaccessibleSlot) {
+            return palette.inaccessible();
+        } else if (slot instanceof BootsSlot) {
+            return palette.armourBoots();
+        } else if (slot instanceof LeggingsSlot) {
+            return palette.armourLeggings();
+        } else if (slot instanceof ChestplateSlot) {
+            return palette.armourChestplate();
+        } else if (slot instanceof OffhandSlot) {
+            return palette.offHand();
+        } else if (slot instanceof OffhandSlot) {
+            return palette.offHand();
+        } else if (slot instanceof PersonalSlot) {
+            if (group == null) return EMPTY_STACK;
+
+            Mirror<PlayerInventorySlot> mirror = view.getMirror();
+            PlayerInventorySlot pis = mirror.getSlot(rawIndex);
+            if (pis == null) return palette.inaccessible();
+
+            return palette.getPersonalSlotPlaceholder(pis, group);
+        }
+
+        return EMPTY_STACK;
+    }
 
 }

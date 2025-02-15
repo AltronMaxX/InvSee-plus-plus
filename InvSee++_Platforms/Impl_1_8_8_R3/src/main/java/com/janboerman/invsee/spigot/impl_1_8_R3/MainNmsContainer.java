@@ -32,25 +32,34 @@ class MainNmsContainer extends Container {
     private MainBukkitInventoryView bukkitView;
     final DifferenceTracker tracker;
 
-    private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY) {
+    private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY, ItemStack inaccessiblePlaceholder) {
         final PlayerInventorySlot place = mirror.getSlot(positionIndex);
 
         if (place == null) {
-            return new InaccessibleSlot(top, positionIndex, magicX, magicY);
+            return new InaccessiblePlaceholderSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY);
         } else if (place.isContainer()) {
             final int referringTo = place.ordinal() - PlayerInventorySlot.CONTAINER_00.ordinal();
             return new Slot(top, referringTo, magicX, magicY); //magicX and magicY correct here? it seems to work though.
-        } else if (place.isArmour()) {
-            final int referringTo = place.ordinal() - PlayerInventorySlot.ARMOUR_BOOTS.ordinal() + 36;
-            return new Slot(top, referringTo, magicX, magicY); //idem?
+        } else if (place == PlayerInventorySlot.ARMOUR_BOOTS) {
+            final int referringTo = 36;
+            return new BootsSlot(top, referringTo, magicX, magicY); //idem?
+        } else if (place == PlayerInventorySlot.ARMOUR_LEGGINGS) {
+            final int referringTo = 37;
+            return new LeggingsSlot(top, referringTo, magicX, magicY); //idem?
+        } else if (place == PlayerInventorySlot.ARMOUR_CHESTPLATE) {
+            final int referringTo = 38;
+            return new ChestplateSlot(top, referringTo, magicX, magicY); //idem?
+        } else if (place == PlayerInventorySlot.ARMOUR_HELMET) {
+            final int referringTo = 39;
+            return new HelmetSlot(top, referringTo, magicX, magicY); //idem?
         } else if (place.isPersonal()) {
             final int referringTo = place.ordinal() - PlayerInventorySlot.PERSONAL_00.ordinal() + 45;
             return new PersonalSlot(top, referringTo, magicX, magicY); //idem?
         } else if (place.isCursor() && !spectatingOwnInventory) {
             final int referringTo = 41;
-            return new Slot(top, referringTo, magicX, magicY); //idem?
+            return new CursorSlot(top, referringTo, magicX, magicY); //idem?
         } else {
-            return new InaccessibleSlot(top, positionIndex, magicX, magicY); //idem?
+            return new InaccessiblePlaceholderSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY); //idem?
         }
     }
 
@@ -116,7 +125,7 @@ class MainNmsContainer extends Container {
                 int index = xPos + yPos * 9;
                 int magicX = 8 + xPos * 18;
                 int magicY = 18 + yPos * 18;
-                a(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY));
+                a(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY, CraftItemStack.asNMSCopy(creationOptions.getPlaceholderPalette().inaccessible())));
             }
         }
 

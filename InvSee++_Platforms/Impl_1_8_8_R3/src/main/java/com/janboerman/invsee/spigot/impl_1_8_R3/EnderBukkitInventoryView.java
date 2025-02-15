@@ -1,19 +1,22 @@
 package com.janboerman.invsee.spigot.impl_1_8_R3;
 
+import javax.annotation.Nullable;
+
+import org.bukkit.craftbukkit.v1_8_R3.inventory.CraftItemStack;
+import org.bukkit.entity.HumanEntity;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventory;
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.logging.Difference;
 import com.janboerman.invsee.spigot.api.logging.DifferenceTracker;
-import org.bukkit.craftbukkit.v1_8_R3.inventory.CraftItemStack;
-import org.bukkit.entity.HumanEntity;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
+import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
 
-import javax.annotation.Nullable;
+class EnderBukkitInventoryView extends BukkitInventoryView<EnderChestSlot> implements EnderSpectatorInventoryView {
 
-class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
-
-    private final EnderNmsContainer nms;
+    final EnderNmsContainer nms;
 
     EnderBukkitInventoryView(EnderNmsContainer nms) {
         super(nms.creationOptions);
@@ -36,8 +39,13 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
     }
 
     @Override
+    public InventoryType getType() {
+        return InventoryType.CHEST;
+    }
+
+    @Override
     public void setItem(int slot, ItemStack item) {
-        var stack = CraftItemStack.asNMSCopy(item);
+        net.minecraft.server.v1_8_R3.ItemStack stack = CraftItemStack.asNMSCopy(item);
         if (slot >= 0) {
             nms.getSlot(slot).set(stack);
         } else {
@@ -47,7 +55,17 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
 
     @Override
     public ItemStack getItem(int slot) {
-        return slot < 0 ? null : CraftItemStack.asCraftMirror(nms.getSlot(slot).getItem());
+        if (slot < 0) {
+            return null;
+        } else {
+            net.minecraft.server.v1_8_R3.ItemStack nmsStack;
+            if (slot < nms.top.getSize()) {
+                nmsStack = nms.top.getContents()[slot];
+            } else {
+                nmsStack = nms.getSlot(slot).getItem();
+            }
+            return CraftItemStack.asCraftMirror(nmsStack);
+        }
     }
 
     @Override

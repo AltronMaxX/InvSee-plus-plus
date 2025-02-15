@@ -39,7 +39,7 @@ class MainNmsInventory extends AbstractNmsInventory<PlayerInventorySlot, MainBuk
         this.storageContents = inv.items;
         this.armourContents = inv.armor;
         this.offHand = inv.extraSlots;
-        this.onCursor = new Ref<>() {
+        this.onCursor = new Ref<ItemStack>() {
             @Override
             public void set(ItemStack item) {
                 inv.setCarried(item);
@@ -276,7 +276,10 @@ class MainNmsInventory extends AbstractNmsInventory<PlayerInventorySlot, MainBuk
         armourContents.clear();
         offHand.clear();
         onCursor.set(InvseeImpl.EMPTY_STACK);
-        playerCraftingContents.clear();
+        personalContents.clear();
+        if (personalContents != playerCraftingContents) {
+            playerCraftingContents.clear();
+        }
     }
 
     @Override

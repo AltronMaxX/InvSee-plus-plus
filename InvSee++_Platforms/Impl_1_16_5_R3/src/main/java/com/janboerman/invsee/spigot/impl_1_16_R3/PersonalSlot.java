@@ -4,16 +4,16 @@ import net.minecraft.server.v1_16_R3.EntityHuman;
 import net.minecraft.server.v1_16_R3.ItemStack;
 import net.minecraft.server.v1_16_R3.Slot;
 
-public class PersonalSlot extends Slot {
+class PersonalSlot extends Slot {
 
     //a slot in the MainNmsContainer that sits on the 6th row representing the items in the player's crafting inventory
     //which could be either the 4-slot part in the player's own inventory, or a real workbench inventory.
     //this class could be used for slots other personal-inventories too such as anvils, grindstones, enchanting tables, looms, etc.
-    public PersonalSlot(MainNmsInventory inventory, int index, int xPos, int yPos) {
+    PersonalSlot(MainNmsInventory inventory, int index, int xPos, int yPos) {
         super(inventory, index, xPos, yPos);
     }
 
-    private boolean works() {
+    boolean works() {
         MainNmsInventory inv = (MainNmsInventory) super.inventory;  //because of bug in Magma's remapper, call super.inventory instead of this.inventory.
         int personalSize = inv.personalContents.size();
         boolean inRange = 45 <= HybridServerSupport.slot(this) && HybridServerSupport.slot(this) < 45 + personalSize;

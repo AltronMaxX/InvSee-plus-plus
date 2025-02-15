@@ -38,6 +38,7 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		this.maxStack = size;
 	}
 
+	//vanilla
 	@Override
 	public int getMaxStackSize() {
 		return maxStack;
@@ -55,32 +56,38 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		setChanged();
 	}
 
+	//vanilla
 	@Override
 	public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
 		return new EnderNmsContainer(containerId, this, playerInventory, player, creationOptions);
 	}
 
+	//vanilla
 	@Override
 	public Component getDisplayName() {
 		//return new TextComponent("minecraft:generic_9x" + (storageContents.size() / 9));
 		return CraftChatMessage.fromStringOrNull(creationOptions.getTitle().titleFor(Target.byGameProfile(targetPlayerUuid, targetPlayerName)));
 	}
 
+	//vanilla
 	@Override
 	public void clearContent() {
 		storageContents.clear();
 	}
 
+	//vanilla
 	@Override
 	public int getContainerSize() {
 		return storageContents.size();
 	}
 
+	//craftbukkit
 	@Override
 	public List<ItemStack> getContents() {
 		return storageContents;
 	}
 
+	//vanilla
 	@Override
 	public ItemStack getItem(int slot) {
 		if (slot < 0 || slot >= getContainerSize()) return ItemStack.EMPTY;
@@ -88,6 +95,7 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		return storageContents.get(slot);
 	}
 
+	//vanilla
 	@Override
 	public boolean isEmpty() {
 		for (ItemStack stack : storageContents) {
@@ -96,16 +104,19 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		return true;
 	}
 
+	//craftbukkit
 	@Override
 	public void onClose(CraftHumanEntity bukkitPlayer) {
 		super.onClose(bukkitPlayer);
 	}
 
+	//craftbukkit
 	@Override
 	public void onOpen(CraftHumanEntity bukkitPlayer) {
 		super.onOpen(bukkitPlayer);
 	}
 
+	//vanilla
 	@Override
 	public ItemStack removeItem(int slot, int amount) {
 		if (slot < 0 || slot >= getContainerSize()) return ItemStack.EMPTY;
@@ -117,6 +128,7 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		return stack;
 	}
 
+	//vanilla
 	@Override
 	public ItemStack removeItemNoUpdate(int slot) {
 		if (slot < 0 || slot >= getContainerSize()) return ItemStack.EMPTY;
@@ -130,11 +142,13 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		}
 	}
 
+	//vanilla
 	@Override
 	public void setChanged() {
 		//probably don't need to do anything here.
 	}
 
+	//vanilla
 	@Override
 	public void setItem(int slot, ItemStack itemStack) {
 		if (slot < 0 || slot >= getContainerSize()) return;
@@ -147,62 +161,11 @@ class EnderNmsInventory extends AbstractNmsInventory<EnderChestSlot, EnderBukkit
 		setChanged();
 	}
 
+	//vanilla
 	@Override
 	public boolean stillValid(Player player) {
 		//no chest lock
 		return true;
 	}
-
-
-	// === workarounds for Mohist ===
-	//TODO are SRG names stable?
-
-//	public int m_6893_() {
-//		return getMaxStackSize();
-//	}
-//
-//	public void m_6211_() {
-//		clearContent();
-//	}
-//
-//	public AbstractContainerMenu m_7208_(int containerId, Inventory playerInventory, Player viewer) {
-//		return createMenu(containerId, playerInventory, viewer);
-//	}
-//
-//	public Component m_5446_() {
-//		return getDisplayName();
-//	}
-//
-//	public int m_6643_() {
-//		return getContainerSize();
-//	}
-//
-//	public ItemStack m_8020_(int slot) {
-//		return getItem(slot);
-//	}
-//
-//	public boolean m_7983_() {
-//		return isEmpty();
-//	}
-//
-//	public ItemStack m_7407_(int slot, int amount) {
-//		return removeItem(slot, amount);
-//	}
-//
-//	public ItemStack m_8016_(int slot) {
-//		return removeItemNoUpdate(slot);
-//	}
-//
-//	public void m_6596_() {
-//		setChanged();
-//	}
-//
-//	public void m_6836_(int slot, ItemStack itemStack) {
-//		setItem(slot, itemStack);
-//	}
-//
-//	public boolean m_6542_(Player player) {
-//		return stillValid(player);
-//	}
 
 }

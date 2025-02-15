@@ -33,11 +33,11 @@ class MainNmsContainer extends AbstractContainerMenu {
 	private MainBukkitInventoryView bukkitView;
 	final DifferenceTracker tracker;
 
-	private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY) {
+	private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY, ItemStack inaccessiblePlaceholder) {
 		final PlayerInventorySlot place = mirror.getSlot(positionIndex);
 
 		if (place == null) {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY);
+			return new InaccessiblePlaceholderSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY);
 		} else if (place.isContainer()) {
 			final int referringTo = place.ordinal() - PlayerInventorySlot.CONTAINER_00.ordinal();
 			return new Slot(top, referringTo, magicX, magicY); //magicX and magicY correct here? it seems to work though.
@@ -61,9 +61,9 @@ class MainNmsContainer extends AbstractContainerMenu {
 			return new OffhandSlot(top, referringTo, magicX, magicY); //idem?
 		} else if (place.isCursor() && !spectatingOwnInventory) {
 			final int referringTo = 41;
-			return new Slot(top, referringTo, magicX, magicY); //idem?
+			return new CursorSlot(top, referringTo, magicX, magicY); //idem?
 		} else {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY); //idem?
+			return new InaccessiblePlaceholderSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY); //idem?
 		}
 	}
 
@@ -129,7 +129,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 				int magicX = 8 + xPos * 18;
 				int magicY = 18 + yPos * 18;
 
-				super.addSlot(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY));	// Mohist compat: call super.addSlot instead of this.addSlot
+				super.addSlot(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY, CraftItemStack.asNMSCopy(creationOptions.getPlaceholderPalette().inaccessible())));	// Mohist compat: call super.addSlot instead of this.addSlot
 			}
 		}
 		
@@ -179,7 +179,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 			return ItemStack.EMPTY;
 		
 		ItemStack itemStack = ItemStack.EMPTY;
-		final Slot slot = getSlot(rawIndex);
+		final Slot slot = super.getSlot(rawIndex);																// Mohist: super
 		final int topRows = 6;
 		
 		if (slot != null && slot.hasItem()) {
@@ -188,12 +188,12 @@ class MainNmsContainer extends AbstractContainerMenu {
 			itemStack = clickedSlotItem.copy();
 			if (rawIndex < topRows * 9) {
 				//clicked in the top inventory
-				if (!moveItemStackTo(clickedSlotItem, topRows * 9, this.slots.size(), true)) {
+				if (!super.moveItemStackTo(clickedSlotItem, topRows * 9, super.slots.size(), true)) {	// Mohist: super (2x)
 					return ItemStack.EMPTY;
 				}
 			} else {
 				//clicked in the bottom inventory
-				if (!moveItemStackTo(clickedSlotItem, 0, topRows * 9, false)) {
+				if (!super.moveItemStackTo(clickedSlotItem, 0, topRows * 9, false)) {				// Mohist: super
 					return ItemStack.EMPTY;
 				}
 			}
@@ -218,6 +218,11 @@ class MainNmsContainer extends AbstractContainerMenu {
 	@Override
 	public MenuType<?> getType() {
 		return super.getType();
+	}
+
+	@Override
+	public Slot getSlot(int rawIndex) {
+		return super.getSlot(rawIndex);
 	}
 
 	public void m_150399_(int i, int j, ClickType clicktype, Player entityHuman) {

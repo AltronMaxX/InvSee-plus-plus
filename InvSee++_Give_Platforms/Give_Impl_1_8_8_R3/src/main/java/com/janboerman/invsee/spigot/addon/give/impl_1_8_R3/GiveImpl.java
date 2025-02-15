@@ -15,6 +15,7 @@ import net.minecraft.server.v1_8_R3.NBTTagList;
 import net.minecraft.server.v1_8_R3.NBTTagLong;
 import net.minecraft.server.v1_8_R3.NBTTagShort;
 import net.minecraft.server.v1_8_R3.NBTTagString;
+import net.minecraft.server.v1_8_R3.IInventory;
 import org.bukkit.craftbukkit.v1_8_R3.inventory.CraftItemStack;
 
 import java.util.Map.Entry;
@@ -28,7 +29,7 @@ public class GiveImpl extends NeditImpl {
 
     @Override
     protected org.bukkit.inventory.ItemStack applyTag(org.bukkit.inventory.ItemStack stack, NBTCompound tag) {
-        var nmsStack = CraftItemStack.asNMSCopy(stack);
+        net.minecraft.server.v1_8_R3.ItemStack nmsStack = CraftItemStack.asNMSCopy(stack);
         NBTTagCompound nmsTag = convert(tag);
         nmsStack.setTag(nmsTag);
         return CraftItemStack.asCraftMirror(nmsStack);
@@ -67,4 +68,8 @@ public class GiveImpl extends NeditImpl {
         return listTag;
     }
 
+    @Override
+    public int maxStackSize() {
+        return IInventory.MAX_STACK;
+    }
 }

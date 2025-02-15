@@ -56,4 +56,10 @@ public class GiveImpl extends NeditImpl {
                     .collect(Collectors.toList()));
     }
 
+    @Override
+    public int maxStackSize() {
+        // There does not seem to be any field or method in Glowstone to ge tthis value.
+        return 64;
+    }
+
 }

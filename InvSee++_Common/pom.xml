@@ -2,7 +2,7 @@
     <parent>
         <artifactId>invsee-plus-plus</artifactId>
         <groupId>com.janboerman.invsee</groupId>
-        <version>0.22.6-SNAPSHOT</version>
+        <version>0.29.17-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -15,9 +15,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.verison}</version>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <release>11</release>
+                    <release>8</release>
                     <testRelease>17</testRelease>
                     <parameters>true</parameters> <!-- because the api contains methods with lots of overloads, emitting the parameter names is good for IDE support -->
                 </configuration>
@@ -67,7 +67,7 @@
         </repository>
         <repository>
             <id>techscode</id>
-            <url>https://repo.techscode.com/repository/maven-releases/</url>
+            <url>https://repo.techscode.com/repository/techscode-apis/</url>
         </repository>
     </repositories>
 
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.19.4-R0.1-SNAPSHOT</version>
+            <version>1.21-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -110,17 +110,31 @@
             <version>2.9</version>
             <scope>provided</scope>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>net.alpenblock</groupId>-->
+<!--            <artifactId>BungeePerms</artifactId>-->
+<!--            <version>3.0-dev-80</version>-->
+<!--            <scope>provided</scope>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>net.alpenblock</groupId>
             <artifactId>BungeePerms</artifactId>
             <version>3.0-dev-80</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${basedir}/../.libs/BungeePerms-3.0-dev-80.jar</systemPath>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>me.TechsCode</groupId>-->
+<!--            <artifactId>UltraPermissionsAPI</artifactId>-->
+<!--            <version>5.5.2</version>-->
+<!--            <scope>provided</scope>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>me.TechsCode</groupId>
             <artifactId>UltraPermissionsAPI</artifactId>
-            <version>1.0.0</version>
-            <scope>provided</scope>
+            <version>5.5.2</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/../.libs/UltraPermissionsAPI-5.5.2.jar</systemPath>
         </dependency>
 
         <!-- testing -->

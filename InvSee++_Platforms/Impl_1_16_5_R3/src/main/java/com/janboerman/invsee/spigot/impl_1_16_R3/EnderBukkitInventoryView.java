@@ -4,16 +4,19 @@ import com.janboerman.invsee.spigot.api.EnderSpectatorInventory;
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.logging.Difference;
 import com.janboerman.invsee.spigot.api.logging.DifferenceTracker;
+import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
+
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack;
 import org.bukkit.entity.HumanEntity;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import javax.annotation.Nullable;
 
-class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
+class EnderBukkitInventoryView extends BukkitInventoryView<EnderChestSlot> implements EnderSpectatorInventoryView {
 
-    private final EnderNmsContainer nms;
+    final EnderNmsContainer nms;
 
     EnderBukkitInventoryView(EnderNmsContainer nms) {
         super(nms.creationOptions);
@@ -52,7 +55,17 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
 
     @Override
     public ItemStack getItem(int slot) {
-        return slot < 0 ? null : CraftItemStack.asCraftMirror(nms.getSlot(slot).getItem());
+        if (slot < 0) {
+            return null;
+        } else {
+            net.minecraft.server.v1_16_R3.ItemStack nmsStack;
+            if (slot < nms.top.getSize()) {
+                nmsStack = nms.top.getContents().get(slot);
+            } else {
+                nmsStack = nms.getSlot(slot).getItem();
+            }
+            return CraftItemStack.asCraftMirror(nmsStack);
+        }
     }
 
     @Override
@@ -60,4 +73,10 @@ class EnderBukkitInventoryView extends EnderSpectatorInventoryView {
         DifferenceTracker tracker = nms.tracker;
         return tracker == null ? null : tracker.getDifference();
     }
+    
+	@Override
+	public InventoryType getType() {
+		return InventoryType.CHEST;
+	}
+
 }

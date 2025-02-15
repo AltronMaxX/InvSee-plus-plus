@@ -33,11 +33,12 @@ class MainNmsContainer extends AbstractContainerMenu {
 	private MainBukkitInventoryView bukkitView;
 	final DifferenceTracker tracker;
 
-	private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY) {
+	private static Slot makeSlot(Mirror<PlayerInventorySlot> mirror, boolean spectatingOwnInventory, MainNmsInventory top, int positionIndex, int magicX, int magicY,
+								 ItemStack inaccessiblePlaceholder) {
 		final PlayerInventorySlot place = mirror.getSlot(positionIndex);
 
 		if (place == null) {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY);
+			return new InaccessibleSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY);
 		} else if (place.isContainer()) {
 			final int referringTo = place.ordinal() - PlayerInventorySlot.CONTAINER_00.ordinal();
 			return new Slot(top, referringTo, magicX, magicY); //magicX and magicY correct here? it seems to work though.
@@ -55,15 +56,15 @@ class MainNmsContainer extends AbstractContainerMenu {
 			return new HelmetSlot(top, referringTo, magicX, magicY); //idem?
 		} else if (place.isPersonal()) {
 			final int referringTo = place.ordinal() - PlayerInventorySlot.PERSONAL_00.ordinal() + 45;
-			return new PersonalSlot(top, referringTo, magicX, magicY); //idem?
+			return new PersonalSlot(inaccessiblePlaceholder, top, referringTo, magicX, magicY); //idem?
 		} else if (place.isOffHand()) {
 			final int referringTo = 40;
 			return new OffhandSlot(top, referringTo, magicX, magicY); //idem?
 		} else if (place.isCursor() && !spectatingOwnInventory) {
 			final int referringTo = 41;
-			return new Slot(top, referringTo, magicX, magicY); //idem?
+			return new CursorSlot(top, referringTo, magicX, magicY); //idem?
 		} else {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY); //idem?
+			return new InaccessibleSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY); //idem?
 		}
 	}
 
@@ -129,7 +130,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 				int magicX = 8 + xPos * 18;
 				int magicY = 18 + yPos * 18;
 
-				super.addSlot(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY));	// Mohist compat: call super.addSlot instead of this.addSlot
+				addSlot(makeSlot(mirror, spectatingOwnInventory, top, index, magicX, magicY, CraftItemStack.asNMSCopy(creationOptions.getPlaceholderPalette().inaccessible())));
 			}
 		}
 		
@@ -142,7 +143,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 				int index = xPos + yPos * 9;
 				int magicX = 8 + xPos * 18;
 				int magicY = 103 + yPos * 18 + magicAddY;
-				super.addSlot(new Slot(bottomInventory, index, magicX, magicY));						// Mohist compat: call super.addSlot instead of this.addSlot
+				addSlot(new Slot(bottomInventory, index, magicX, magicY));
 			}
 		}
 		
@@ -151,7 +152,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 			int index = xPos;
 			int magicX = 8 + xPos * 18;
 			int magicY = 161 + magicAddY;
-			super.addSlot(new Slot(bottomInventory, index, magicX, magicY));							// Mohist compat: call super.addSlot instead of this.addSlot
+			addSlot(new Slot(bottomInventory, index, magicX, magicY));
 		}
 	}
 
@@ -188,7 +189,7 @@ class MainNmsContainer extends AbstractContainerMenu {
 			itemStack = clickedSlotItem.copy();
 			if (rawIndex < topRows * 9) {
 				//clicked in the top inventory
-				if (!moveItemStackTo(clickedSlotItem, topRows * 9, this.slots.size(), true)) {
+				if (!moveItemStackTo(clickedSlotItem, topRows * 9, slots.size(), true)) {
 					return ItemStack.EMPTY;
 				}
 			} else {
@@ -208,33 +209,8 @@ class MainNmsContainer extends AbstractContainerMenu {
 		return itemStack;
 	}
 
-	String title() {
+	public String title() {
 		return title != null ? title : originalTitle;
 	}
-
-
-	// === workarounds for Mohist ===
-	//TODO are SRG names stable?
-
-//	@Override
-//	public MenuType<?> getType() {
-//		return super.getType();
-//	}
-//
-//	public void m_150399_(int i, int j, ClickType clicktype, Player entityHuman) {
-//		clicked(i, j, clicktype, entityHuman);
-//	}
-//
-//	public void m_6877_(Player entityHuman) {
-//		removed(entityHuman);
-//	}
-//
-//	public boolean m_6875_(Player entityHuman) {
-//		return stillValid(entityHuman);
-//	}
-//
-//	public ItemStack m_7648_(Player entityHuman, int rawIndex) {
-//		return quickMoveStack(entityHuman, rawIndex);
-//	}
 
 }

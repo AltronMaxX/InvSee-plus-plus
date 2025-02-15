@@ -32,7 +32,6 @@ import org.bukkit.entity.Player;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public class EnderseeCommandExecutor implements CommandExecutor {
@@ -73,7 +72,8 @@ public class EnderseeCommandExecutor implements CommandExecutor {
                 .withOfflinePlayerSupport(plugin.offlinePlayerSupport())
                 .withUnknownPlayerSupport(plugin.unknownPlayerSupport())
                 .withBypassExemptedPlayers(player.hasPermission(Exempt.BYPASS_EXEMPT_ENDERCHEST))
-                .withLogOptions(plugin.getLogOptions());
+                .withLogOptions(plugin.getLogOptions())
+                .withPlaceholderPalette(plugin.getPlaceholderPalette());
 
         CompletableFuture<SpectateResponse<EnderSpectatorInventory>> pwiFuture = null;
 

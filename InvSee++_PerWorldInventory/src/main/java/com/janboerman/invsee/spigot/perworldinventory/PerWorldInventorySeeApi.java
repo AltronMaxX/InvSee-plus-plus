@@ -1,5 +1,7 @@
 package com.janboerman.invsee.spigot.perworldinventory;
 
+import static com.janboerman.invsee.utils.Compat.ifPresentOrElse;
+
 import com.janboerman.invsee.spigot.api.CreationOptions;
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventory;
 import com.janboerman.invsee.spigot.api.EnderSpectatorInventoryView;
@@ -9,6 +11,7 @@ import com.janboerman.invsee.spigot.api.MainSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.SpectatorInventory;
 import com.janboerman.invsee.spigot.api.response.NotCreatedReason;
 import com.janboerman.invsee.spigot.api.response.OpenResponse;
+import com.janboerman.invsee.spigot.api.response.SaveResponse;
 import com.janboerman.invsee.spigot.api.response.SpectateResponse;
 import com.janboerman.invsee.spigot.api.target.Target;
 import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
@@ -199,7 +202,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 ((Personal) mainSpectator).watch(event.getView());
             }
 
-            var spectator = cache.getMainSpectatorInventory(player.getUniqueId());
+            MainSpectatorInventory spectator = cache.getMainSpectatorInventory(player.getUniqueId());
             if (spectator instanceof Personal) {
                 ((Personal) spectator).watch(event.getView());
             }
@@ -215,7 +218,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 ((Personal) mainSpectator).unwatch();
             }
 
-            var spectator = cache.getMainSpectatorInventory(player.getUniqueId());
+            MainSpectatorInventory spectator = cache.getMainSpectatorInventory(player.getUniqueId());
             if (spectator instanceof Personal) {
                 ((Personal) spectator).unwatch();
             }
@@ -263,7 +266,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 viewers.forEach(HumanEntity::closeInventory);
 
                 CompletableFuture<Optional<MainSpectatorInventory>> snapshotFuture = asSnapShotInventory(mainSpectator);
-                snapshotFuture.thenAccept(optional -> optional.ifPresentOrElse(newSpectatorInventory -> {
+                snapshotFuture.thenAccept(optional -> ifPresentOrElse(optional, newSpectatorInventory -> {
                     inventories.put(oldProfileKey, newSpectatorInventory);
                     inventoryKeys.put(newSpectatorInventory, oldProfileKey);
                     newSpectatorInventory.setContents(contents);
@@ -276,7 +279,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 ItemStack[] contents = enderSpectator.getContents();                        //already is a copy
 
                 CompletableFuture<Optional<EnderSpectatorInventory>> snapshotFuture = asSnapShotInventory(enderSpectator);
-                snapshotFuture.thenAccept(optional -> optional.ifPresentOrElse(newSpectatorInventory -> {
+                snapshotFuture.thenAccept(optional -> ifPresentOrElse(optional, newSpectatorInventory -> {
                     enderchests.put(oldProfileKey, newSpectatorInventory);
                     enderchestKeys.put(newSpectatorInventory, oldProfileKey);
                     newSpectatorInventory.setContents(contents);
@@ -312,7 +315,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 executor.execute(() -> {
                     //run in the next tick to ensure that the player has changed worlds and the live inventory is actually really live
                     Optional<MainSpectatorInventory> liveFuture = asLiveInventory(mainSpectator, false);
-                    liveFuture.ifPresentOrElse(liveSpectator -> {
+                    ifPresentOrElse(liveFuture, liveSpectator -> {
                         inventories.put(newProfileKey, liveSpectator);
                         inventoryKeys.put(liveSpectator, newProfileKey);
                         liveSpectator.setContents(contents);    //updates the player's inventory!
@@ -330,7 +333,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                 executor.execute(() -> {
                     //run in the next tick to ensure that the player has changed worlds and the live inventory is actually really live
                     Optional<EnderSpectatorInventory> liveFuture = asLiveInventory(enderSpectator, false);
-                    liveFuture.ifPresentOrElse(liveSpectator -> {
+                    ifPresentOrElse(liveFuture, liveSpectator -> {
                         enderchests.put(newProfileKey, liveSpectator);
                         enderchestKeys.put(liveSpectator, newProfileKey);
                         liveSpectator.setContents(contents);
@@ -379,7 +382,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
     }
 
     @Override
-    public CompletableFuture<Void> saveInventory(MainSpectatorInventory inventory) {
+    public CompletableFuture<SaveResponse> saveInventory(MainSpectatorInventory inventory) {
         ProfileKey profileKey = inventoryKeys.get(inventory);
         boolean saveVanilla = false;
 
@@ -439,7 +442,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
     }
 
     @Override
-    public CompletableFuture<Void> saveEnderChest(EnderSpectatorInventory enderChest) {
+    public CompletableFuture<SaveResponse> saveEnderChest(EnderSpectatorInventory enderChest) {
         ProfileKey profileKey = inventoryKeys.get(enderChest);
 
         boolean saveVanilla = false;
@@ -520,7 +523,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
         }, runnable -> scheduler.executeSyncPlayer(playerId, runnable, null));
     }
 
-    public CompletableFuture<Void> saveInventory(MainSpectatorInventory inventory, ProfileKey profileKey, boolean saveVanilla) {
+    public CompletableFuture<SaveResponse> saveInventory(MainSpectatorInventory inventory, ProfileKey profileKey, boolean saveVanilla) {
         //if the spectated player is managed by PWI (because its world is managed by PWI)
         //then also save the inventory to PWI's storage
         //that can be done by loading the profile, applying the contents from the MainSpectatorInventory and saving it again
@@ -570,9 +573,15 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                     profile.getBalance());
             pwiHook.getProfileCache().put(profileKey, updatedProfile);
 
+            final CompletableFuture<SaveResponse> vanillaTask;
             CompletableFuture<Void> saveTask = CompletableFuture.runAsync(() -> pwiHook.getDataSource().savePlayer(profileKey, updatedProfile), scheduler::executeAsync);
-            if (saveVanilla) saveTask = CompletableFuture.allOf(saveTask, wrapped.saveInventory(inventory));
-            return saveTask;
+            if (saveVanilla) {
+                vanillaTask = wrapped.saveInventory(inventory);
+                saveTask = CompletableFuture.allOf(saveTask, vanillaTask);
+            } else {
+                vanillaTask = null;
+            }
+            return saveTask.thenApply(_void -> vanillaTask == null ? SaveResponse.saved(inventory) : vanillaTask.join());
         }
     }
 
@@ -627,7 +636,7 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
         }, runnable -> scheduler.executeSyncPlayer(playerId, runnable, null));
     }
 
-    public CompletableFuture<Void> saveEnderChest(EnderSpectatorInventory enderChest, ProfileKey profileKey, boolean saveVanilla) {
+    public CompletableFuture<SaveResponse> saveEnderChest(EnderSpectatorInventory enderChest, ProfileKey profileKey, boolean saveVanilla) {
         //if the spectated player is managed by PWI (because its world is managed by PWI)
         //then also save the inventory to PWI's storage
         //that can be done by loading the profile, applying the contents from the EnderSpectatorInventory and saving it again
@@ -669,9 +678,15 @@ public class PerWorldInventorySeeApi extends InvseeAPI implements InvseePlatform
                     profile.getBalance());
             pwiHook.getProfileCache().put(profileKey, updatedProfile);
 
+            final CompletableFuture<SaveResponse> vanillaTask;
             CompletableFuture<Void> saveTask = CompletableFuture.runAsync(() -> pwiHook.getDataSource().savePlayer(profileKey, updatedProfile), scheduler::executeAsync);
-            if (saveVanilla) saveTask = CompletableFuture.allOf(saveTask, wrapped.saveEnderChest(enderChest));
-            return saveTask;
+            if (saveVanilla) {
+                vanillaTask = wrapped.saveEnderChest(enderChest);
+                saveTask = CompletableFuture.allOf(saveTask, vanillaTask);
+            } else {
+                vanillaTask = null;
+            }
+            return saveTask.thenApply(_void -> vanillaTask == null ? SaveResponse.saved(enderChest) : vanillaTask.join());
         }
     }
 

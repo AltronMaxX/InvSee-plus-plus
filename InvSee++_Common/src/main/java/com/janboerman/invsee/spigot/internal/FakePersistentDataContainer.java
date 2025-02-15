@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.UnknownServiceException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 
@@ -33,7 +34,7 @@ public class FakePersistentDataContainer implements PersistentDataContainer {
 
     @Override
     public <T, Z> boolean has(NamespacedKey namespacedKey, PersistentDataType<T, Z> persistentDataType) {
-        var inner = map.get(namespacedKey);
+        Map<PersistentDataType, Object> inner = map.get(namespacedKey);
         if (inner == null) return false;
         return inner.containsKey(persistentDataType);
     }
@@ -45,14 +46,14 @@ public class FakePersistentDataContainer implements PersistentDataContainer {
 
     @Override
     public <T, Z> Z get(NamespacedKey namespacedKey, PersistentDataType<T, Z> persistentDataType) {
-        var inner = map.get(namespacedKey);
+        Map<PersistentDataType, Object> inner = map.get(namespacedKey);
         if (inner == null) return null;
         return (Z) inner.get(persistentDataType);
     }
 
     @Override
     public <T, Z> Z getOrDefault(NamespacedKey namespacedKey, PersistentDataType<T, Z> persistentDataType, Z z) {
-        var inner = map.get(namespacedKey);
+        Map<PersistentDataType, Object> inner = map.get(namespacedKey);
         if (inner == null) return z;
         if (inner.containsKey(persistentDataType)) {
             return (Z) inner.get(persistentDataType);
@@ -74,6 +75,18 @@ public class FakePersistentDataContainer implements PersistentDataContainer {
     @Override
     public boolean isEmpty() {
         return map.isEmpty();
+    }
+
+    @Override
+    public void copyTo(@NotNull PersistentDataContainer persistentDataContainer, boolean replace) {
+        FakePersistentDataContainer other = (FakePersistentDataContainer) persistentDataContainer;
+        if (replace) {
+            other.map.putAll(this.map);
+        } else {
+            for (Entry<NamespacedKey, Map<PersistentDataType, Object>> entry : this.map.entrySet()) {
+                other.map.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     @Override
@@ -103,7 +116,7 @@ public class FakePersistentDataContainer implements PersistentDataContainer {
             for (NamespacedKey key : getKeys()) {
                 Map<PersistentDataType, Object> innerMap = map.get(key);
 
-                for (var entry : innerMap.entrySet()) {
+                for (Entry<PersistentDataType, Object> entry : innerMap.entrySet()) {
                     PersistentDataType pdt = entry.getKey();
                     Object myValue = entry.getValue();
 
@@ -128,6 +141,11 @@ public class FakePersistentDataContainer implements PersistentDataContainer {
     @Override
     public void readFromBytes(byte @NotNull [] bytes, boolean b) throws IOException {
         throw new UnknownServiceException("Can't deserialize fake data");
+    }
+
+    @Override
+    public void readFromBytes(byte @NotNull [] bytes) throws IOException {
+        PersistentDataContainer.super.readFromBytes(bytes);
     }
 
 }

@@ -22,11 +22,4 @@ class FakeEntityHuman extends Player {
 		return false;
 	}
 
-
-	// === workarounds for Mohist ===
-
-	@Override
-	public void readAdditionalSaveData(CompoundTag tag) {
-		super.readAdditionalSaveData(tag);
-	}
 }

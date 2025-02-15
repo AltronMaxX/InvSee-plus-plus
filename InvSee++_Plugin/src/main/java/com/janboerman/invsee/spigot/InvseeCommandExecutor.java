@@ -65,7 +65,8 @@ public class InvseeCommandExecutor implements CommandExecutor {
                 .withOfflinePlayerSupport(plugin.offlinePlayerSupport())
                 .withUnknownPlayerSupport(plugin.unknownPlayerSupport())
                 .withBypassExemptedPlayers(player.hasPermission(Exempt.BYPASS_EXEMPT_INVENTORY))
-                .withLogOptions(plugin.getLogOptions());
+                .withLogOptions(plugin.getLogOptions())
+                .withPlaceholderPalette(plugin.getPlaceholderPalette());
 
         CompletableFuture<SpectateResponse<MainSpectatorInventory>> pwiFuture = null;
 
@@ -87,7 +88,8 @@ public class InvseeCommandExecutor implements CommandExecutor {
             pwiFuture = uuidFuture.thenCompose(optId -> {
                 if (optId.isPresent()) {
                     UUID uniqueId = optId.get();
-                    var profileId = new com.janboerman.invsee.spigot.perworldinventory.ProfileId(pwiApi.getHook(), pwiOptions, uniqueId);
+                    com.janboerman.invsee.spigot.perworldinventory.ProfileId profileId
+                            = new com.janboerman.invsee.spigot.perworldinventory.ProfileId(pwiApi.getHook(), pwiOptions, uniqueId);
                     CompletableFuture<String> userNameFuture = finalIsUuid
                             ? api.fetchUserName(uniqueId).thenApply(o -> o.orElse("InvSee++ Player")).exceptionally(t -> "InvSee++ Player")
                             : CompletableFuture.completedFuture(playerNameOrUUID);

@@ -31,6 +31,9 @@ import java.util.List;
 
 final class GlowstoneHacks {
 
+    private GlowstoneHacks() {
+    }
+
     static List<GlowInventorySlot> getSlots(GlowInventory inventory) {
         try {
             Field field = GlowInventory.class.getDeclaredField("slots");
@@ -57,7 +60,7 @@ final class GlowstoneHacks {
 
         MessageHandler<GlowSession, WindowClickMessage> oldHandler = (MessageHandler) playHandlers.find(WindowClickMessage.class);
         if (oldHandler != null && !(oldHandler instanceof DecoratedWindowClickHandler)) { //idempotency!
-            var newHandler = new DecoratedWindowClickHandler(oldHandler);
+            DecoratedWindowClickHandler newHandler = new DecoratedWindowClickHandler(oldHandler);
             try {
                 playHandlers.bind(WindowClickMessage.class, newHandler);
             } catch (InstantiationException | IllegalAccessException neverThrown) {
@@ -67,7 +70,7 @@ final class GlowstoneHacks {
     }
 
     private static PlayProtocol getPlayProtocol(GlowServer server) {
-        //TODO getNetworkServer() returns null?
+        // NOTE: server.getNetworkServer() can return null when the server is still initialising.
         return server.getNetworkServer().getProtocolProvider().getPlay();
     }
 

@@ -45,11 +45,11 @@ class EnderNmsContainer extends AbstractContainerMenu {
 		};
 	}
 
-	private static Slot makeSlot(Mirror<EnderChestSlot> mirror, EnderNmsInventory top, int positionIndex, int magicX, int magicY) {
+	private static Slot makeSlot(Mirror<EnderChestSlot> mirror, EnderNmsInventory top, int positionIndex, int magicX, int magicY, ItemStack inaccessiblePlaceholder) {
 		final EnderChestSlot place = mirror.getSlot(positionIndex);
 
 		if (place == null) {
-			return new InaccessibleSlot(top, positionIndex, magicX, magicY);
+			return new InaccessiblePlaceholderSlot(inaccessiblePlaceholder, top, positionIndex, magicX, magicY);
 		} else {
 			final int referringTo = place.ordinal();
 			return new Slot(top, referringTo, magicX, magicY);
@@ -117,7 +117,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
 				int magicX = 8 + xPos * 18;
 				int magicY = 18 + yPos * 18;
 
-				super.addSlot(makeSlot(mirror, top, index, magicX, magicY));	// Mohist compat: call super.addSlot instead of this.addSlot
+				super.addSlot(makeSlot(mirror, top, index, magicX, magicY, CraftItemStack.asNMSCopy(creationOptions.getPlaceholderPalette().inaccessible())));	// Mohist compat: call super.addSlot instead of this.addSlot
 			}
 		}
 		
@@ -162,7 +162,7 @@ class EnderNmsContainer extends AbstractContainerMenu {
         //remember that we are called from inside the body of a loop!
 
 		ItemStack itemStack = ItemStack.EMPTY;
-		Slot slot = this.getSlot(rawIndex);
+		Slot slot = super.getSlot(rawIndex);																		// Mohist: super
 		
 		if (slot != null && slot.hasItem()) {
 			ItemStack clickedSlotItem = slot.getItem();
@@ -170,12 +170,12 @@ class EnderNmsContainer extends AbstractContainerMenu {
 			itemStack = clickedSlotItem.copy();
 			if (rawIndex < topRows * 9) {
 				//clicked in the top inventory
-				if (!moveItemStackTo(clickedSlotItem, topRows * 9, this.slots.size(), true)) {
+				if (!super.moveItemStackTo(clickedSlotItem, topRows * 9, super.slots.size(), true)) {		// Mohist: super (2x)
 					return ItemStack.EMPTY;
 				}
 			} else {
 				//clicked in the bottom inventory
-				if (!moveItemStackTo(clickedSlotItem, 0, topRows * 9, false)) {
+				if (!super.moveItemStackTo(clickedSlotItem, 0, topRows * 9, false)) {					// Mohist: super
 					return ItemStack.EMPTY;
 				}
 			}
@@ -200,6 +200,11 @@ class EnderNmsContainer extends AbstractContainerMenu {
 	@Override
 	public MenuType<?> getType() {
 		return super.getType();
+	}
+
+	@Override
+	public Slot getSlot(int rawIndex) {
+		return super.getSlot(rawIndex);
 	}
 
 	public void m_150399_(int i, int j, ClickType clicktype, Player entityHuman) {

@@ -10,6 +10,7 @@ import com.janboerman.invsee.spigot.api.target.Target;
 import com.janboerman.invsee.spigot.api.template.PlayerInventorySlot;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
@@ -17,11 +18,13 @@ import org.bukkit.plugin.Plugin;
 import javax.annotation.Nullable;
 import java.util.List;
 
-class MainInventoryView extends MainSpectatorInventoryView {
+class MainInventoryView extends BukkitInventoryView<PlayerInventorySlot> implements MainSpectatorInventoryView {
 
     private final HumanEntity spectator;
     private final MainInventory top;
     private final PlayerInventory bottom;
+
+    private final ItemStack inaccessiblePlaceholder;
 
     private DifferenceTracker diffTracker;
 
@@ -42,6 +45,8 @@ class MainInventoryView extends MainSpectatorInventoryView {
                     logOptions.getGranularity());
             diffTracker.onOpen();
         }
+
+        this.inaccessiblePlaceholder = creationOptions.getPlaceholderPalette().inaccessible();
     }
 
     @Override
@@ -64,7 +69,7 @@ class MainInventoryView extends MainSpectatorInventoryView {
         MainInventory top;
         if (0 <= slot && slot < (top = getTopInventory()).getSize()) {
             PlayerInventorySlot piSlot = getMirror().getSlot(slot);
-            return piSlot == null ? null : top.getItem(piSlot.defaultIndex());
+            return piSlot == null ? inaccessiblePlaceholder : top.getItem(piSlot.defaultIndex());
         } else {
             return super.getItem(slot);
         }
@@ -97,5 +102,9 @@ class MainInventoryView extends MainSpectatorInventoryView {
             diffTracker.onClose();
     }
 
+    @Override
+    public InventoryType getType() {
+        return InventoryType.CHEST;
+    }
 
 }

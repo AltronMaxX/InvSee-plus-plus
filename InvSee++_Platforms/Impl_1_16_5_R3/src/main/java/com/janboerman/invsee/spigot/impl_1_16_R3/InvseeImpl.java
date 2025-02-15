@@ -6,13 +6,15 @@ import com.janboerman.invsee.spigot.api.EnderSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.MainSpectatorInventory;
 import com.janboerman.invsee.spigot.api.MainSpectatorInventoryView;
 import com.janboerman.invsee.spigot.api.SpectatorInventory;
-import com.janboerman.invsee.spigot.api.response.NotCreatedReason;
-import com.janboerman.invsee.spigot.api.response.NotOpenedReason;
-import com.janboerman.invsee.spigot.api.response.OpenResponse;
-import com.janboerman.invsee.spigot.api.response.SpectateResponse;
+import com.janboerman.invsee.spigot.api.event.SpectatorInventorySaveEvent;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderGroup;
+import com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette;
+import com.janboerman.invsee.spigot.api.response.*;
 import com.janboerman.invsee.spigot.api.target.Target;
 import com.janboerman.invsee.spigot.api.template.EnderChestSlot;
+import com.janboerman.invsee.spigot.api.template.Mirror;
 import com.janboerman.invsee.spigot.api.template.PlayerInventorySlot;
+import com.janboerman.invsee.spigot.internal.EventHelper;
 import com.janboerman.invsee.spigot.internal.InvseePlatform;
 import com.janboerman.invsee.spigot.internal.NamesAndUUIDs;
 import com.janboerman.invsee.spigot.internal.OpenSpectatorsCache;
@@ -27,6 +29,7 @@ import org.bukkit.craftbukkit.v1_16_R3.CraftWorld;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftHumanEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftInventory;
+import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack;
 import org.bukkit.craftbukkit.v1_16_R3.util.CraftChatMessage;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -85,7 +88,35 @@ public class InvseeImpl implements InvseePlatform {
             nmsPlayer.activeContainer = nmsWindow;
             nmsPlayer.playerConnection.sendPacket(new PacketPlayOutOpenWindow(windowId, nmsWindow.getType(), nmsWindow.getTitle()));
             nmsWindow.addSlotListener(nmsPlayer);
-            return OpenResponse.open(nmsWindow.getBukkitView());
+            MainBukkitInventoryView bukkitView = nmsWindow.getBukkitView();
+
+            //send placeholders
+            Mirror<PlayerInventorySlot> mirror = options.getMirror();
+            PlaceholderPalette palette = options.getPlaceholderPalette();
+            ItemStack inaccessible = CraftItemStack.asNMSCopy(palette.inaccessible());
+            for (int i = PlayerInventorySlot.CONTAINER_35.defaultIndex() + 1; i < nmsInventory.getSize(); i++) {
+                Integer idx = mirror.getIndex(PlayerInventorySlot.byDefaultIndex(i));
+                if (idx == null) {
+                    sendItemChange(nmsPlayer, i, inaccessible);
+                    continue;
+                }
+                int rawIndex = idx.intValue();
+
+                Slot slot = nmsWindow.getSlot(rawIndex);
+                if (slot.hasItem()) continue;
+
+                //slot has no item, send placeholder.
+                if (slot instanceof InaccessibleSlot) sendItemChange(nmsPlayer, rawIndex, inaccessible);
+                else if (slot instanceof BootsSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.armourBoots()));
+                else if (slot instanceof LeggingsSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.armourLeggings()));
+                else if (slot instanceof ChestplateSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.armourChestplate()));
+                else if (slot instanceof HelmetSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.armourHelmet()));
+                else if (slot instanceof OffhandSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.offHand()));
+                else if (slot instanceof CursorSlot) sendItemChange(nmsPlayer, rawIndex, CraftItemStack.asNMSCopy(palette.cursor()));
+                else if (slot instanceof PersonalSlot) sendItemChange(nmsPlayer, rawIndex, ((PersonalSlot) slot).works() ? CraftItemStack.asNMSCopy(palette.generic()) : inaccessible);
+            }
+
+            return OpenResponse.open(bukkitView);
         }
     }
 
@@ -149,12 +180,12 @@ public class InvseeImpl implements InvseePlatform {
     }
 
     @Override
-    public CompletableFuture<Void> saveInventory(MainSpectatorInventory newInventory) {
+    public CompletableFuture<SaveResponse> saveInventory(MainSpectatorInventory newInventory) {
         return save(newInventory, this::spectateInventory, MainSpectatorInventory::setContents);
     }
 
     @Override
-    public CompletableFuture<Void> saveEnderChest(EnderSpectatorInventory newInventory) {
+    public CompletableFuture<SaveResponse> saveEnderChest(EnderSpectatorInventory newInventory) {
         return save(newInventory, this::spectateEnderChest, EnderSpectatorInventory::setContents);
     }
 
@@ -189,13 +220,16 @@ public class InvseeImpl implements InvseePlatform {
             }
 
             CraftHumanEntity craftHumanEntity = new CraftHumanEntity(server, fakeEntityHuman);
-            return SpectateResponse.succeed(invCreator.apply(craftHumanEntity, options));
+            return SpectateResponse.succeed(EventHelper.callSpectatorInventoryOfflineCreatedEvent(server, invCreator.apply(craftHumanEntity, options)));
         }, runnable -> scheduler.executeSyncPlayer(player, runnable, null));
     }
 
-    private <Slot, SI extends SpectatorInventory<Slot>> CompletableFuture<Void> save(SI newInventory, BiFunction<? super HumanEntity, ? super CreationOptions<Slot>, SI> currentInvProvider, BiConsumer<SI, SI> transfer) {
+    private <Slot, SI extends SpectatorInventory<Slot>> CompletableFuture<SaveResponse> save(SI newInventory, BiFunction<? super HumanEntity, ? super CreationOptions<Slot>, SI> currentInvProvider, BiConsumer<SI, SI> transfer) {
 
         CraftServer server = (CraftServer) plugin.getServer();
+        SpectatorInventorySaveEvent event = EventHelper.callSpectatorInventorySaveEvent(server, newInventory);
+        if (event.isCancelled()) return CompletableFuture.completedFuture(SaveResponse.notSaved(newInventory));
+
         DedicatedPlayerList playerList = server.getHandle();
         WorldNBTStorage worldNBTStorage = playerList.playerFileData;
 
@@ -209,7 +243,7 @@ public class InvseeImpl implements InvseePlatform {
                 gameProfile,
                 new PlayerInteractManager(world.getHandle()));
 
-        return CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             NBTTagCompound playerCompound = worldNBTStorage.load(fakeEntityPlayer);
             if (playerCompound != null) {
                 ((EntityPlayer) fakeEntityPlayer).load(playerCompound);   //all entity stuff + player stuff     //cast to EntityPlayer to work around a Magma bug
@@ -222,6 +256,7 @@ public class InvseeImpl implements InvseePlatform {
             transfer.accept(currentInv, newInventory);
 
             worldNBTStorage.save(fakeEntityPlayer);
+            return SaveResponse.saved(currentInv);
         }, runnable -> scheduler.executeSyncPlayer(playerId, runnable, null));
     }
 
@@ -243,4 +278,50 @@ public class InvseeImpl implements InvseePlatform {
         }
     }
 
+    @Override
+    public com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette getPlaceholderPalette(String name) {
+        switch (name) {
+            case "glass panes": return Placeholders.PALETTE_GLASS;
+            case "icons": return Placeholders.PALETTE_ICONS;
+            default: return com.janboerman.invsee.spigot.api.placeholder.PlaceholderPalette.empty();
+        }
+    }
+
+    static void sendItemChange(EntityPlayer entityPlayer, int rawIndex, ItemStack toSend) {
+        Container container = entityPlayer.activeContainer;
+        entityPlayer.playerConnection.sendPacket(new PacketPlayOutSetSlot(container.windowId, rawIndex, toSend));
+    }
+
+    static ItemStack getItemOrPlaceholder(PlaceholderPalette palette, MainBukkitInventoryView view, int rawIndex, PlaceholderGroup group) {
+        Slot slot = view.nms.getSlot(rawIndex);
+        if (slot.hasItem()) return slot.getItem();
+
+        if (slot instanceof InaccessibleSlot) {
+            return CraftItemStack.asNMSCopy(palette.inaccessible());
+        } else if (slot instanceof BootsSlot) {
+            return CraftItemStack.asNMSCopy(palette.armourBoots());
+        } else if (slot instanceof LeggingsSlot) {
+            return CraftItemStack.asNMSCopy(palette.armourLeggings());
+        } else if (slot instanceof ChestplateSlot) {
+            return CraftItemStack.asNMSCopy(palette.armourChestplate());
+        } else if (slot instanceof HelmetSlot) {
+            return CraftItemStack.asNMSCopy(palette.armourLeggings());
+        } else if (slot instanceof OffhandSlot) {
+            return CraftItemStack.asNMSCopy(palette.offHand());
+        } else if (slot instanceof CursorSlot) {
+            return CraftItemStack.asNMSCopy(palette.cursor());
+        } else if (slot instanceof PersonalSlot) {
+            PersonalSlot personalSlot = (PersonalSlot) slot;
+            if (!personalSlot.works()) return CraftItemStack.asNMSCopy(palette.inaccessible());
+            if (group == null) return EMPTY_STACK; //no group for personal slot -> fall back to empty stack
+
+            Mirror<PlayerInventorySlot> mirror = view.nms.creationOptions.getMirror();
+            PlayerInventorySlot pis = mirror.getSlot(rawIndex);
+            if (pis == null) return CraftItemStack.asNMSCopy(palette.inaccessible());
+
+            return CraftItemStack.asNMSCopy(palette.getPersonalSlotPlaceholder(pis, group));
+        } else {
+            return EMPTY_STACK;
+        }
+    }
 }
